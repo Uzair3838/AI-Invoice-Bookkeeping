@@ -1,0 +1,1208 @@
+{
+  "name": "Approval/Rejection Handling",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -960,
+        80
+      ],
+      "id": "af9fc2cf-6974-414a-85ba-6d34e08bcd85",
+      "name": "Telegram Trigger",
+      "webhookId": "9a27306d-5ef4-458d-af27-ed47d9c51fbb",
+      "retryOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "2BpvBl4NbmZC592P",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const callback = $json.callback_query;\n\nconst [decision, invoice_number] = callback.data.split('|');\n\nreturn [\n  {\n    json: {\n      decision,\n      invoice_number: invoice_number.trim(),\n      chat_id: callback.message.chat.id,\n      message_id: callback.message.message_id,\n      callback_query_id: callback.id\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        368
+      ],
+      "id": "82e2728e-6478-4607-89d2-dbd52c5410b0",
+      "name": "Process Approval Decision1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ad2da675-c661-435e-9bf1-84de00ad5fbc",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "APPROVE",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -816,
+        368
+      ],
+      "id": "bbd9fd7d-040b-4bef-a243-b97387f58651",
+      "name": "Check Approval Decision1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      id: $json.id,\n\n      invoice_number: $json.invoice_number,\n      vendor: $json.vendor,\n      invoice_date: $json.invoice_date,\n      tax_id: $json.tax_id,\n      currency: $json.currency,\n      subtotal: $json.subtotal,\n      tax: $json.tax,\n      total: $json.total,\n      expense_category: $json.expense_category,\n\n      status: \"APPROVED\",\n      approval_status: \"APPROVED\",\n\n      created_at: $json.created_at,\n      approved_at: new Date().toISOString(),\n\n      review_reason: $json.review_reason ?? null\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        256
+      ],
+      "id": "0d593b98-260b-43b3-a196-23e5884b6903",
+      "name": "Prepare Approved Record"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invoice_number",
+              "keyValue": "={{ $json.invoice_number.trim() }}"
+            },
+            {
+              "keyName": "approval_status",
+              "keyValue": "PENDING"
+            }
+          ]
+        },
+        "limit": 10
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -544,
+        256
+      ],
+      "id": "07ef1e74-c833-4ed9-adb5-490d0d6ea989",
+      "name": "Get Pending Invoice",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "moUoBjVVqGTYs0ll",
+          "mode": "list",
+          "cachedResultName": "invoice_ledger",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/moUoBjVVqGTYs0ll"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "invoice_number": "={{ $json.invoice_number }}",
+            "invoice_date": "={{ $json.invoice_date }}",
+            "vendor": "={{ $json.vendor }}",
+            "tax_id": "={{ $json.tax_id }}",
+            "subtotal": "={{ $json.subtotal }}",
+            "currency": "={{ $json.currency }}",
+            "tax": "={{ $json.tax }}",
+            "expense_category": "={{ $json.expense_category }}",
+            "created_at": "={{ $now }}",
+            "status": "APPROVED",
+            "total": "={{ $json.total }}",
+            "approval_status": "={{ $json.approval_status }}",
+            "approved_at": "={{ $json.approved_at }}",
+            "review_reason": "={{ $json.review_reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tax_id",
+              "displayName": "tax_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expense_category",
+              "displayName": "expense_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_at",
+              "displayName": "approved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "review_reason",
+              "displayName": "review_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        256
+      ],
+      "id": "02f723b8-09b9-4629-9a87-4776288619c2",
+      "name": "Write to Invoice Ledger"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invoice_number",
+              "keyValue": "={{ $json.invoice_number.trim() }}"
+            }
+          ]
+        },
+        "limit": 10
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -608,
+        464
+      ],
+      "id": "2a89b323-275b-412e-8eb6-f08e00b4c6c9",
+      "name": "Get Pending Invoice for Rejection"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      id: $json.id,\n      invoice_number: $json.invoice_number,\n      vendor: $json.vendor,\n      invoice_date: $json.invoice_date,\n      tax_id: $json.tax_id,\n      currency: $json.currency,\n      subtotal: $json.subtotal,\n      tax: $json.tax,\n      total: $json.total,\n      expense_category: $json.expense_category,\n\n      status: \"REJECTED\",\n      approval_status: \"REJECTED\",\n\n      created_at: $json.created_at,\n      rejected_at: new Date().toISOString(),\n\n      review_reason: \"Invoice rejected by human reviewer\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        464
+      ],
+      "id": "3c92fcf8-a6d8-4f3b-bc6d-4ed0469eb464",
+      "name": "Prepare Rejected Record"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "approval_status": "={{ $json.approval_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tax_id",
+              "displayName": "tax_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expense_category",
+              "displayName": "expense_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        256
+      ],
+      "id": "f4c5eafc-bbc1-41e0-b26a-b1e4c4905efd",
+      "name": "Update Approved Invoice"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "approval_status": "={{ $json.approval_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tax_id",
+              "displayName": "tax_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expense_category",
+              "displayName": "expense_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        464
+      ],
+      "id": "7592613f-4988-4b3c-b5a1-e7c303c5a82a",
+      "name": "Update Rejected Invoice"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  throw new Error('No pending invoice found.');\n}\n\nconst latest = items.reduce((latest, current) => {\n  const latestId = Number(latest.json.id || 0);\n  const currentId = Number(current.json.id || 0);\n\n  return currentId > latestId ? current : latest;\n});\n\nreturn [latest];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        464
+      ],
+      "id": "bf48e5f3-c844-431e-801e-8d1a2eba02e3",
+      "name": "Select Latest Pending Invoice"
+    },
+    {
+      "parameters": {
+        "chatId": "=1995883971",
+        "text": "=❌ INVOICE REJECTED  \n\nVendor: {{ $json.vendor }} \n\nInvoice: {{ $json.invoice_number }} \n\nDate: {{ $json.invoice_date }} \n\nTotal: {{ $json.currency }} {{ $json.total }}  \n\nThe invoice was rejected and was not added to the invoice ledger.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        464
+      ],
+      "id": "80cf1fd0-7fb6-43fc-8ff6-0782887f902d",
+      "name": "Send Rejection Confirmation",
+      "webhookId": "780bd603-4012-4921-8c77-8cddc1087df9",
+      "credentials": {
+        "telegramApi": {
+          "id": "2BpvBl4NbmZC592P",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  throw new Error('No pending invoice found.');\n}\n\nconst latest = items.reduce((latest, current) => {\n  const latestId = Number(latest.json.id || 0);\n  const currentId = Number(current.json.id || 0);\n\n  return currentId > latestId ? current : latest;\n});\n\nreturn [latest];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        256
+      ],
+      "id": "b5cfd190-725b-41a3-b0b4-facb8b89e531",
+      "name": "Select Latest Pending Invoice1"
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invoice_number",
+              "keyValue": "={{ $json.invoice_number }}"
+            },
+            {
+              "keyName": "vendor",
+              "keyValue": "={{ $json.vendor }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "APPROVED"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        256
+      ],
+      "id": "d9bad855-cfef-462e-9244-d406fda4b780",
+      "name": "Delete row(s)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "vendor",
+              "keyValue": "={{ $('Update Rejected Invoice').item.json.vendor }}"
+            },
+            {
+              "keyName": "invoice_number",
+              "keyValue": "={{ $('Update Rejected Invoice').item.json.invoice_number }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "={{ $('Update Rejected Invoice').item.json.status }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        464
+      ],
+      "id": "8202a4b9-4547-481b-8954-60fc030e496d",
+      "name": "Delete row(s)1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ZMivb1-qMr6gIRzJDfgWZCpwWvzCbrRZxyzapyX46fg",
+          "mode": "list",
+          "cachedResultName": "Invoice Ledger(for project 1)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZMivb1-qMr6gIRzJDfgWZCpwWvzCbrRZxyzapyX46fg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZMivb1-qMr6gIRzJDfgWZCpwWvzCbrRZxyzapyX46fg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "invoice_number": "={{ $json.invoice_number }}",
+            "vendor": "={{ $json.vendor }}",
+            "invoice_date": "={{ $json.invoice_date }}",
+            "tax_id": "={{ $json.tax_id }}",
+            "tax": "={{ $json.tax }}",
+            "currency": "={{ $json.currency }}",
+            "subtotal": "={{ $json.subtotal }}",
+            "total": "={{ $json.total }}",
+            "created_at": "={{ $json.created_at }}",
+            "expense_category": "={{ $json.expense_category }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tax_id",
+              "displayName": "tax_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expense_category",
+              "displayName": "expense_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        752,
+        256
+      ],
+      "id": "0493cb2f-2e4f-42fd-b65e-d6ebf2272910",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3ZVWUFzirePcsmS3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5567ede7-3a65-403c-b582-60789b042c26",
+              "leftValue": "={{ Object.keys($json).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -336,
+        256
+      ],
+      "id": "2affe0a1-f24d-4e7f-a217-eaa0b66e5e7a",
+      "name": "Check Pending Invoice Found"
+    },
+    {
+      "parameters": {
+        "chatId": "1995883971",
+        "text": "=⚠️ INVOICE ALREADY PROCESSED  Invoice: {{ $('Process Approval Decision1').item.json.invoice_number }}  This invoice is no longer pending approval.  It may have already been approved or rejected. No new ledger entry was created.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -144,
+        48
+      ],
+      "id": "43338684-c8e1-4ca0-a1b2-1dbe65bc29a9",
+      "name": "Send a text message",
+      "webhookId": "90c95f7f-82de-4ea9-9c22-24454e048b97",
+      "credentials": {
+        "telegramApi": {
+          "id": "2BpvBl4NbmZC592P",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Approval Decision1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Approval Decision1": {
+      "main": [
+        [
+          {
+            "node": "Check Approval Decision1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Approval Decision1": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Pending Invoice for Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Approved Record": {
+      "main": [
+        [
+          {
+            "node": "Update Approved Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Invoice": {
+      "main": [
+        [
+          {
+            "node": "Check Pending Invoice Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Invoice Ledger": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Invoice for Rejection": {
+      "main": [
+        [
+          {
+            "node": "Select Latest Pending Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Rejected Record": {
+      "main": [
+        [
+          {
+            "node": "Update Rejected Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Approved Invoice": {
+      "main": [
+        [
+          {
+            "node": "Write to Invoice Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Rejected Invoice": {
+      "main": [
+        [
+          {
+            "node": "Send Rejection Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Latest Pending Invoice": {
+      "main": [
+        [
+          {
+            "node": "Prepare Rejected Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Rejection Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Delete row(s)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Latest Pending Invoice1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Approved Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Delete row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Pending Invoice Found": {
+      "main": [
+        [
+          {
+            "node": "Select Latest Pending Invoice1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "xrXE9DbX9runAoje",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "deff3747-6438-43af-bfaf-1967929f3659",
+  "meta": {
+    "instanceId": "21af39d031e44810cbc3636096abcfd9f567cbc2bb27f118ab88da76843cd618"
+  },
+  "nodeGroups": [],
+  "id": "rTmKVKWCmzoiUFSD",
+  "tags": []
+}

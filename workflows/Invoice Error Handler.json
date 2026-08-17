@@ -1,0 +1,181 @@
+{
+  "name": "Invoice Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8556f971-d48d-44ab-be35-ec969edc8fc3",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "chatId": "1995883971",
+        "text": "=🚨 WORKFLOW ERROR  Workflow: {{ $json.workflow.name }}  Node: {{ $json.execution.lastNodeExecuted }}  Error: {{ $json.execution.error.message }}  Time: {{ $now }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "98240482-fc59-4f50-a2d0-fb79251b5792",
+      "name": "Send a text message",
+      "webhookId": "99de0b96-f84a-4230-a1c0-9cbf573efb1a",
+      "credentials": {
+        "telegramApi": {
+          "id": "2BpvBl4NbmZC592P",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "2IvPel3xXDvvkvnW",
+          "mode": "list",
+          "cachedResultName": "invoice_error_log",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/2IvPel3xXDvvkvnW"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_name": "={{ $('Error Trigger').first().json.workflow.name }}",
+            "failed_node": "={{ $('Error Trigger').first().json.execution.lastNodeExecuted }}",
+            "execution_id": "={{ $('Error Trigger').first().json.execution.id }}",
+            "error_message": "={{ $('Error Trigger').first().json.execution.error.message }}",
+            "error_time": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "failed_node",
+              "displayName": "failed_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "error_message",
+              "displayName": "error_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "error_time",
+              "displayName": "error_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "column": [
+            {
+              "name": "workflow_name"
+            },
+            {
+              "name": "execution_id"
+            },
+            {
+              "name": "failed_node"
+            },
+            {
+              "name": "error_message"
+            },
+            {
+              "name": "error_time"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "fe739187-2378-4896-bea8-09a104110b7a",
+      "name": "Insert row"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "989520b6-ac8b-47ef-9ff5-2de6db4af865",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "21af39d031e44810cbc3636096abcfd9f567cbc2bb27f118ab88da76843cd618"
+  },
+  "nodeGroups": [],
+  "id": "xrXE9DbX9runAoje",
+  "tags": []
+}

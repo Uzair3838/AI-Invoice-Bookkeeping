@@ -1,0 +1,8 @@
+.env
+*.env
+credentials.json
+*.sqlite
+*.db
+node_modules/
+__pycache__/
+invoice_data/

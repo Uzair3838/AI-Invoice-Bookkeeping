@@ -1,0 +1,902 @@
+{
+  "name": "Invoice Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "fileSelector": "D:/Projects/n8n/Project_1/Invoice_1.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        32
+      ],
+      "id": "472e37ac-5e82-4569-8961-e6be3eb089ca",
+      "name": "Read Invoice File"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "34f61005-30d4-456a-adb9-acf842cfa45a"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "42812f7d-ec9c-4167-8917-79a4e1b2dcee",
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        32
+      ],
+      "id": "03bcfea4-13a6-4525-9c7b-8dc34309ee2d",
+      "name": "Route by File Type"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        -64
+      ],
+      "id": "3d6525d9-f00f-40c9-b9f6-c4287d418470",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an invoice and receipt data extraction system.\n\nExtract structured accounting information from the document below.\n\nReturn ONLY valid JSON.\nDo not return Markdown.\nDo not use ```json.\nDo not add explanations before or after the JSON.\n\nUse this exact structure:\n\n{\n  \"vendor\": null,\n  \"invoice_number\": null,\n  \"invoice_date\": null,\n  \"tax_id\": null,\n  \"currency\": null,\n  \"line_items\": [\n    {\n      \"description\": null,\n      \"quantity\": null,\n      \"unit_price\": null,\n      \"amount\": null\n    }\n  ],\n  \"subtotal\": null,\n  \"tax\": null,\n  \"total\": null,\n  \"expense_category\": null,\n  \"confidence\": null\n}\n\nRules:\n\n1. Do not invent information.\n2. Preserve the invoice number exactly.\n3. Use YYYY-MM-DD for dates when the date is unambiguous.\n4. Monetary values must be numbers, not strings.\n5. Quantity must be a number.\n6. Unit price must be a number.\n7. Amount must be a number.\n8. Subtotal, tax, and total must be numbers.\n9. Use null when information is missing or cannot be determined.\n10. confidence must be a number between 0 and 1.\n\nChoose expense_category from ONLY these categories:\n\nOffice Supplies\nSoftware\nHardware\nTravel\nMeals\nUtilities\nMarketing\nProfessional Services\nRent\nShipping\nOther\n\nBefore returning the result, verify whether:\n\nsubtotal + tax = total\n\nDo not explain the calculation.\n\nDOCUMENT:\n\n{{ $json.text }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        656,
+        -64
+      ],
+      "id": "96e4ac1a-9a21-48a7-b3cd-0db6c859d402",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "model": "gpt-oss:20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -496
+      ],
+      "id": "952cac52-d032-4efd-9fe1-3cc006345dd3",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "fQ50wygBs0YdpTUt",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.text;\n\nif (!rawText) {\n  throw new Error(\"AI response does not contain a 'text' field.\");\n}\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(rawText);\n} catch (error) {\n  throw new Error(\n    `AI returned invalid JSON: ${error.message}\\n\\nRaw response:\\n${rawText}`\n  );\n}\n\nreturn [\n  {\n    json: parsed\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -32
+      ],
+      "id": "7ba0dd13-c6a4-4f64-bcd6-b1030807ed04",
+      "name": "Parse AI JSON1",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const invoice = $json;\n\nconst anomalies = [];\n\n// --------------------------------------------------\n// 1. Required field validation\n// --------------------------------------------------\n\nif (!invoice.vendor || String(invoice.vendor).trim() === '') {\n  anomalies.push('Missing vendor');\n}\n\nif (!invoice.invoice_number || String(invoice.invoice_number).trim() === '') {\n  anomalies.push('Missing invoice number');\n}\n\nif (!invoice.invoice_date || String(invoice.invoice_date).trim() === '') {\n  anomalies.push('Missing invoice date');\n}\n\nif (invoice.total === null || invoice.total === undefined) {\n  anomalies.push('Missing total');\n}\n\nif (invoice.subtotal === null || invoice.subtotal === undefined) {\n  anomalies.push('Missing subtotal');\n}\n\nif (invoice.currency === null || invoice.currency === undefined) {\n  anomalies.push('Missing currency');\n}\n\n// --------------------------------------------------\n// 2. Validate line items\n// --------------------------------------------------\n\nlet calculatedSubtotal = 0;\n\nif (!Array.isArray(invoice.line_items)) {\n  anomalies.push('Line items are missing or invalid');\n} else {\n\n  invoice.line_items.forEach((item, index) => {\n\n    const quantity = Number(item.quantity);\n    const unitPrice = Number(item.unit_price);\n    const amount = Number(item.amount);\n\n    if (!item.description) {\n      anomalies.push(`Line item ${index + 1}: missing description`);\n    }\n\n    if (!Number.isFinite(quantity)) {\n      anomalies.push(`Line item ${index + 1}: invalid quantity`);\n    }\n\n    if (!Number.isFinite(unitPrice)) {\n      anomalies.push(`Line item ${index + 1}: invalid unit price`);\n    }\n\n    if (!Number.isFinite(amount)) {\n      anomalies.push(`Line item ${index + 1}: invalid amount`);\n    }\n\n    if (\n      Number.isFinite(quantity) &&\n      Number.isFinite(unitPrice) &&\n      Number.isFinite(amount)\n    ) {\n\n      const expectedAmount = quantity * unitPrice;\n\n      if (Math.abs(expectedAmount - amount) > 0.01) {\n        anomalies.push(\n          `Line item ${index + 1}: amount mismatch`\n        );\n      }\n\n      calculatedSubtotal += amount;\n    }\n  });\n}\n\n// --------------------------------------------------\n// 3. Validate subtotal against line items\n// --------------------------------------------------\n\nif (\n  Number.isFinite(calculatedSubtotal) &&\n  invoice.subtotal !== null &&\n  invoice.subtotal !== undefined\n) {\n\n  const subtotal = Number(invoice.subtotal);\n\n  if (Math.abs(calculatedSubtotal - subtotal) > 0.01) {\n    anomalies.push(\n      `Subtotal mismatch: line items = ${calculatedSubtotal}, invoice subtotal = ${subtotal}`\n    );\n  }\n}\n\n// --------------------------------------------------\n// 4. Validate subtotal + tax = total\n// --------------------------------------------------\n\nif (\n  invoice.subtotal !== null &&\n  invoice.subtotal !== undefined &&\n  invoice.tax !== null &&\n  invoice.tax !== undefined &&\n  invoice.total !== null &&\n  invoice.total !== undefined\n) {\n\n  const subtotal = Number(invoice.subtotal);\n  const tax = Number(invoice.tax);\n  const total = Number(invoice.total);\n\n  const calculatedTotal = subtotal + tax;\n\n  if (Math.abs(calculatedTotal - total) > 0.01) {\n    anomalies.push(\n      `Total mismatch: subtotal + tax = ${calculatedTotal}, invoice total = ${total}`\n    );\n  }\n}\n\n// --------------------------------------------------\n// 5. Validate confidence\n// --------------------------------------------------\n\nif (\n  invoice.confidence === null ||\n  invoice.confidence === undefined\n) {\n\n  anomalies.push('Missing AI confidence');\n\n} else {\n\n  const confidence = Number(invoice.confidence);\n\n  if (!Number.isFinite(confidence)) {\n    anomalies.push('Invalid AI confidence');\n\n  } else if (confidence < 0.75) {\n    anomalies.push(\n      `Low AI confidence: ${confidence}`\n    );\n  }\n}\n\n// --------------------------------------------------\n// 6. Validate expense category\n// --------------------------------------------------\n\nconst validCategories = [\n  'Office Supplies',\n  'Software',\n  'Hardware',\n  'Travel',\n  'Meals',\n  'Utilities',\n  'Marketing',\n  'Professional Services',\n  'Rent',\n  'Shipping',\n  'Other'\n];\n\nif (\n  invoice.expense_category &&\n  !validCategories.includes(invoice.expense_category)\n) {\n  anomalies.push(\n    `Invalid expense category: ${invoice.expense_category}`\n  );\n}\n\n// --------------------------------------------------\n// 7. Final status\n// --------------------------------------------------\n\nconst hasAnomalies = anomalies.length > 0;\n\nreturn [\n  {\n    json: {\n      ...invoice,\n\n      validation: {\n        has_anomalies: hasAnomalies,\n        anomaly_count: anomalies.length,\n        anomalies: anomalies,\n        calculated_subtotal: Number(calculatedSubtotal.toFixed(2)),\n        calculated_total:\n          invoice.subtotal != null && invoice.tax != null\n            ? Number(\n                (Number(invoice.subtotal) + Number(invoice.tax)).toFixed(2)\n              )\n            : null\n      },\n\n      status: hasAnomalies\n        ? 'REVIEW_REQUIRED'\n        : 'VALIDATED'\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -32
+      ],
+      "id": "296e50da-92f9-479e-9b94-ca413c175aca",
+      "name": "Validate Invoice"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$json,\n      branch: 'ANOMALY_REVIEW'\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -448
+      ],
+      "id": "e07c03dc-98b2-448b-a250-c02b53aba071",
+      "name": "Anomaly Branch"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$json,\n      branch: 'CLEAN',\n      duplicate_check_data: {\n        vendor: $json.vendor,\n        invoice_number: $json.invoice_number\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        64
+      ],
+      "id": "29852cb5-33f6-4d3c-bc2b-ba672cc23a9d",
+      "name": "Clean Branch"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$json,\n\n      original_invoice: {\n        vendor: $json.vendor,\n        invoice_number: $json.invoice_number,\n        invoice_date: $json.invoice_date,\n        tax_id: $json.tax_id,\n        currency: $json.currency,\n        line_items: $json.line_items,\n        subtotal: $json.subtotal,\n        tax: $json.tax,\n        total: $json.total,\n        expense_category: $json.expense_category,\n        confidence: $json.confidence,\n        validation: $json.validation,\n        status: $json.status\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        64
+      ],
+      "id": "8298623f-55d7-4b8a-986a-068472f534b9",
+      "name": "Prepare Duplicate Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7dfc8cae-1620-48c5-91cc-d7576345c474",
+              "leftValue": "={{ $json.validation.has_anomalies }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1536,
+        -32
+      ],
+      "id": "40f58e73-e777-448e-b2ef-704613087c0e",
+      "name": "Check Anomalies"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "moUoBjVVqGTYs0ll",
+          "mode": "list",
+          "cachedResultName": "invoice_ledger",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/moUoBjVVqGTYs0ll"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invoice_number",
+              "keyValue": "={{ $json.invoice_number }}"
+            },
+            {
+              "keyName": "vendor",
+              "keyValue": "={{ $json.vendor }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2368,
+        64
+      ],
+      "id": "0e797209-0b45-4f44-90fc-d95661702863",
+      "name": "Check Duplicate Invoice1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1b6bec83-3cdf-47d5-a2d7-7f1114d10fe8",
+              "leftValue": "={{ $json.is_duplicate }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3008,
+        80
+      ],
+      "id": "12d8883f-4d35-4dd5-97a3-7df4a2ffcd90",
+      "name": "Check If Duplicate1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('Prepare Duplicate Check').first().json;\n\nreturn [\n  {\n    json: {\n      ...original,\n\n      status: \"READY_FOR_APPROVAL\",\n      duplicate_detected: false,\n      review_reason: null\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3216,
+        176
+      ],
+      "id": "c30b24b2-13f9-47bc-ba55-b5b3d72bb5e7",
+      "name": "Prepare Ledger Record1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$json,\n      approval_required: true,\n      approval_status: \"PENDING\",\n      approval_requested_at: new Date().toISOString(),\n      approval_message:\n        `Invoice ${$json.invoice_number} from ${$json.vendor} ` +\n        `for ${$json.currency} ${$json.total} requires approval.`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3424,
+        176
+      ],
+      "id": "d575c485-be6f-4280-a350-597dc3f43ab3",
+      "name": "Prepare Approval Request1"
+    },
+    {
+      "parameters": {
+        "chatId": "1995883971",
+        "text": "=🔔 INVOICE APPROVAL REQUIRED  Vendor: {{ $json.vendor }} \nInvoice: {{ $json.invoice_number }} \nDate: {{ $json.invoice_date }} \nSubtotal: {{ $json.currency }} {{ $json.subtotal }} \nTax: {{ $json.currency }} {{ $json.tax }} Total: {{ $json.currency }} {{ $json.total }} Category: {{ $json.expense_category }} Confidence: {{ $json.confidence }}  \nThis invoice has passed validation but requires manual approval.  Please choose an action below.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Approve",
+                    "additionalFields": {
+                      "callback_data": "=APPROVE|  {{ $json.invoice_number }}"
+                    }
+                  },
+                  {
+                    "text": "❌ Reject",
+                    "additionalFields": {
+                      "callback_data": "=REJECT|  {{ $json.invoice_number }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3648,
+        336
+      ],
+      "id": "75747789-92bb-477c-b224-40696ff6c7c3",
+      "name": "Send Invoice Approval1",
+      "webhookId": "b71ea155-c035-4767-b876-7efa9215afaf",
+      "credentials": {
+        "telegramApi": {
+          "id": "2BpvBl4NbmZC592P",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "vendor": "={{ $json.vendor }}",
+            "invoice_number": "={{ $json.invoice_number}}",
+            "invoice_date": "={{ $json.invoice_date }}",
+            "currency": "={{ $json.currency }}",
+            "tax_id": "={{ $json.tax_id }}",
+            "subtotal": "={{ $json.subtotal }}",
+            "total": "={{ $json.total }}",
+            "tax": "={{ $json.tax }}",
+            "expense_category": "={{ $json.expense_category }}",
+            "approval_status": "={{ $json.approval_status }}",
+            "status": "={{ $json.status }}",
+            "created_at": "={{ $json.approval_requested_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tax_id",
+              "displayName": "tax_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expense_category",
+              "displayName": "expense_category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3632,
+        176
+      ],
+      "id": "c63e1d29-b488-46d0-90bc-49050f4b49e4",
+      "name": "Save Pending Invoice"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      ...$json,\n      status: \"DUPLICATE_REVIEW\",\n      duplicate_detected: true,\n      review_reason: \"Duplicate invoice detected\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3216,
+        -16
+      ],
+      "id": "3c2cad00-4173-4611-908c-78bae9c30cc5",
+      "name": "Prepare Duplicate Review"
+    },
+    {
+      "parameters": {
+        "chatId": "1995883971",
+        "text": "=⚠️ DUPLICATE INVOICE DETECTED  \n\nVendor: {{ $json.vendor }} \n\nInvoice: {{ $json.invoice_number }} \n\nDate: {{ $json.invoice_date }} \n\nSubtotal: {{ $json.currency }} {{ $json.subtotal }} \n\nTax: {{ $json.currency }} {{ $json.tax }} \n\nTotal: {{ $json.currency }} {{ $json.total }} \n\nCategory: {{ $json.expense_category }}  \n\nThis invoice already exists in the ledger.  No new ledger entry was created.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3424,
+        -16
+      ],
+      "id": "56b447af-3fff-4484-83fd-1255fc41271c",
+      "name": "Send Duplicate Alert",
+      "webhookId": "7cd365f8-6245-46ac-9929-65d38a4f2081",
+      "credentials": {
+        "telegramApi": {
+          "id": "2BpvBl4NbmZC592P",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "JKkCFzRj9FRbj3Df",
+          "mode": "list",
+          "cachedResultName": "pending_invoices",
+          "cachedResultUrl": "/projects/GdeXBueEvFSguMxm/datatables/JKkCFzRj9FRbj3Df"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invoice_number",
+              "keyValue": "={{ $('Prepare Duplicate Check').item.json.invoice_number }}"
+            },
+            {
+              "keyName": "vendor",
+              "keyValue": "={{ $('Prepare Duplicate Check').item.json.vendor }}"
+            },
+            {
+              "keyName": "approval_status",
+              "keyValue": "PENDING"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2576,
+        64
+      ],
+      "id": "e5e6f682-9db8-4582-aaab-638c00921fc5",
+      "name": "Check Pending Invoice Duplicate",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ledgerResults = $('Check Duplicate Invoice1').all();\nconst pendingResults = $('Check Pending Invoice Duplicate').all();\n\nconst ledgerDuplicate = ledgerResults.some(item => {\n  return item.json && Object.keys(item.json).length > 0;\n});\n\nconst pendingDuplicate = pendingResults.some(item => {\n  return (\n    item.json &&\n    Object.keys(item.json).length > 0 &&\n    item.json.approval_status === 'PENDING'\n  );\n});\n\nconst isDuplicate = ledgerDuplicate || pendingDuplicate;\n\nconst original = $('Prepare Duplicate Check').first().json;\n\nreturn [\n  {\n    json: {\n      ...original,\n      is_duplicate: isDuplicate,\n      duplicate_source: ledgerDuplicate\n        ? 'INVOICE_LEDGER'\n        : pendingDuplicate\n          ? 'PENDING_INVOICES'\n          : null\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        80
+      ],
+      "id": "10b15519-1bed-4bee-8632-ecc8955abea1",
+      "name": "Determine Duplicate"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        32
+      ],
+      "id": "f2d9ce3d-d98d-4cea-883f-d3b035de955c",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "D:\\Projects\\n8n\\Project_1\\n8n_invoice_ocr.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        128
+      ],
+      "id": "86bc54da-1207-47b3-93fa-bf8a5fc436c7",
+      "name": "Write Image for OCR"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read Invoice File": {
+      "main": [
+        [
+          {
+            "node": "Route by File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by File Type": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Image for OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Parse AI JSON1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI JSON1": {
+      "main": [
+        [
+          {
+            "node": "Validate Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Branch": {
+      "main": [
+        [
+          {
+            "node": "Prepare Duplicate Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Duplicate Check": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Invoice1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Anomalies": {
+      "main": [
+        [
+          {
+            "node": "Anomaly Branch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Invoice": {
+      "main": [
+        [
+          {
+            "node": "Check Anomalies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Invoice1": {
+      "main": [
+        [
+          {
+            "node": "Check Pending Invoice Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Duplicate1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Duplicate Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Ledger Record1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Ledger Record1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Approval Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Approval Request1": {
+      "main": [
+        [
+          {
+            "node": "Save Pending Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Pending Invoice": {
+      "main": [
+        [
+          {
+            "node": "Send Invoice Approval1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Duplicate Review": {
+      "main": [
+        [
+          {
+            "node": "Send Duplicate Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Pending Invoice Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Determine Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Check If Duplicate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read Invoice File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Image for OCR": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "xrXE9DbX9runAoje"
+  },
+  "versionId": "363bf454-c64b-48a4-b867-035f5d6b3834",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "21af39d031e44810cbc3636096abcfd9f567cbc2bb27f118ab88da76843cd618"
+  },
+  "nodeGroups": [],
+  "id": "8gvqQFgQiSEhiROh",
+  "tags": []
+}
